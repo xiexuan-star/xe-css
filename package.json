@@ -17,7 +17,7 @@
     "webpack-sources": "^3.2.3",
     "webpack-virtual-modules": "^0.4.3"
   },
-  "main": "dist/index.mjs",
+  "main": "dist/xe-css-plugin.js",
   "exports": {
     ".": {
       "import": "./dist/index.mjs",
