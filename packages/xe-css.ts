@@ -1,6 +1,10 @@
-const { compileTemplate } = require('@vue/compiler-sfc');
-const path = require('path');
-const fs = require('fs');
+import { ElementNode, ForNode, IfBranchNode, IfNode, TemplateChildNode } from '@vue/compiler-core';
+import { XeCSSLoaderContext, XeCSSParserOptions, XeCSSRule } from './types';
+import { compileTemplate, SFCTemplateCompileOptions, SFCTemplateCompileResults } from '@vue/compiler-sfc';
+// @ts-ignore
+import path from 'path';
+// @ts-ignore
+import fs from 'fs';
 // ------------------------------------ constant ---------------------------------
 const MATCHER_TYPE = {
   COMMON: 1 << 1,
@@ -11,7 +15,7 @@ const MATCHER_TYPE = {
 };
 
 // ------------------------------------ utils ---------------------------------
-function transform(v) {
+function transform(v: string) {
   return v.replace(/:/g, '\\:').replace(/\//g, '\\/');
 }
 
@@ -19,15 +23,11 @@ function transform(v) {
  * @param propNode {Node} - get value from a template node
  * @return { String }
  * */
-function unpack(propNode) {
+function unpack(propNode: any): string {
   return (propNode.value && propNode.value.content) || '';
 }
 
-/**
- * @param map {Map<K,V>}
- * @param handler {([K,V])=>void} - handler function to each map's entries
- * */
-function traverseMap(map, handler) {
+function traverseMap<K extends any, V extends any>(map: Map<K, V>, handler: (entry: [K, V]) => void) {
   if (!handler) return;
   const iterator = map.entries();
   while (true) {
@@ -37,38 +37,54 @@ function traverseMap(map, handler) {
   }
 }
 
-/**
- * @param map { Map<K,V>}
- * @return {[K,V][]}
- * */
-function mapToEntries(map) {
-  let result = [];
+function mapToEntries<K extends any, V extends any>(map: Map<K, V>): [K, V][] {
+  let result: [K, V][] = [];
   traverseMap(map, entry => {
     result.push(entry);
   });
   return result;
 }
 
+function isElementNode(node: TemplateChildNode): node is ElementNode {
+  return node.type === 1;
+}
+
+function isIfNode(node: TemplateChildNode): node is IfNode {
+  return node.type === 9;
+}
+
+function isIfBranchNode(node: TemplateChildNode): node is IfBranchNode {
+  return node.type === 10;
+}
+
+function isForNode(node: TemplateChildNode): node is ForNode {
+  return node.type === 11;
+}
+
 // ------------------------------------ constructor ---------------------------------
 /** @constructor */
-class XeCssParser {
+class XeCSSParser {
   needPatch = true;
-  collector = new Map();
-  pseudos = [];
-  tasks = new Set();
+  readonly collector = new Map<string, number>();
+  readonly pseudos: string[] = [];
+  readonly tasks = new Set<Promise<void>>();
+  readonly prefix: string;
+  private readonly pseudoMatcher: RegExp;
+  private readonly commonMarcher: RegExp;
+  private readonly appendMarcher: RegExp;
+  private readonly templateMatcher = /<template>(.|\n)+<\/template>/;
+  private readonly cachePath = path.resolve(__dirname, `xe-css.json`);
 
   /**
    * @param options { {pseudos:string[],prefix:string} }
    * */
-  constructor(options = {}) {
+  constructor(options: XeCSSParserOptions = {}) {
     const { pseudos, prefix } = options;
     this.prefix = prefix || 'xe';
     Array.isArray(pseudos) && (this.pseudos = pseudos);
     this.pseudoMatcher = new RegExp(`^${this.pseudos.map(item => `${item}:`).join('|')}`);
-    this.templateMatcher = /<template>(.|\n)+<\/template>/;
     this.commonMarcher = new RegExp(`^${this.prefix}[:-]?`);
     this.appendMarcher = new RegExp(`${this.prefix}(.*):(.+)`);
-    this.cachePath = path.resolve(__dirname, `xe-css.json`);
   }
 
   emitCache() {
@@ -79,14 +95,14 @@ class XeCssParser {
   }
 
   loadCache() {
-    return new Promise((resolve, reject) => {
+    return new Promise<string>((resolve, reject) => {
       fs.readFile(this.cachePath, (err, content) => {
         err ? reject() : resolve(content.toString('utf8'));
       });
     }).then(
       content => {
         try {
-          JSON.parse(content).forEach(entry => {
+          content && JSON.parse(content).forEach((entry: [string, number]) => {
             this.collector.set(...entry);
           });
         } catch (e) {
@@ -95,7 +111,7 @@ class XeCssParser {
       },
       () => {
         fs.writeFile(this.cachePath, JSON.stringify([]), err => {
-          err & console.log(err);
+          err && console.log(err);
         });
       }
     );
@@ -107,14 +123,14 @@ class XeCssParser {
    * @param tag {MATCHER_TYPE} - a tag for judge property's type
    * @description before collect a xe-css property, it should be analyzed and assembled
    * */
-  collect(property, value, tag) {
+  collect(property: string, value: string, tag: number) {
     if (tag & MATCHER_TYPE.MULTIPLY) {
       value.split(' ').forEach(v => {
-        this.collector.set(`${property}=${v}`, tag);
+        this.collector.set(`${ property }=${ v }`, tag);
       });
     } else {
-      const key = `${property}=${value}`;
-      const oldTag = this.collector.get(key);
+      const key = `${ property }=${ value }`;
+      const oldTag = this.collector.get(key) || 0;
       if (oldTag != null && oldTag !== tag) {
         this.needPatch = true;
       }
@@ -125,7 +141,7 @@ class XeCssParser {
   /**
    * @description set tag from attr info, it can be used to judge the node type
    * */
-  matchAttrType(attr) {
+  matchAttrType(attr: string) {
     let tag = 0;
     if (attr.match(this.commonMarcher)) {
       tag |= MATCHER_TYPE.COMMON;
@@ -138,7 +154,7 @@ class XeCssParser {
   /**
    * @description set tag from attr info, it can be used to judge the node type
    * */
-  matchNodeType(attr, value) {
+  matchNodeType(attr: string, value: string) {
     let tag = 0;
     if (attr.match(this.appendMarcher)) {
       tag |= MATCHER_TYPE.APPEND;
@@ -152,17 +168,17 @@ class XeCssParser {
     return tag;
   }
 
-  mergeBaseCompilerOptions(options) {
+  mergeBaseCompilerOptions(options: { source: string }): SFCTemplateCompileOptions {
     return Object.assign(options, { id: '', filename: '.index.vue' });
   }
 
-  handlerCompileResult(compileResults) {
+  handlerCompileResult(compileResults: SFCTemplateCompileResults) {
     const { ast } = compileResults;
     if (!ast) return;
     this.handleAstChildren(ast.children);
   }
 
-  handleAstChildren(nodeList) {
+  handleAstChildren(nodeList: TemplateChildNode[]) {
     if (!nodeList) return;
     nodeList.forEach(node => {
       /*
@@ -180,17 +196,17 @@ class XeCssParser {
        * FOR = 11,
        * TEXT_CALL = 12,
        */
-      if (node.type === 1) {
+      if (isElementNode(node)) {
         this.parseElementNode(node);
-      } else if (node.type === 9) {
+      } else if (isIfNode(node)) {
         this.handleAstChildren(node.branches);
-      } else if (node.type === 11 || node.type === 10) {
+      } else if (isForNode(node) || isIfBranchNode(node)) {
         this.handleAstChildren(node.children);
       }
     });
   }
 
-  parseElementNode(node) {
+  parseElementNode(node: ElementNode) {
     if (node.props.length) {
       const needParsePropsMap = new Map();
       node.props.forEach(propNode => {
@@ -209,10 +225,10 @@ class XeCssParser {
     this.handleAstChildren(node.children);
   }
 
-  run(source, loaderContext) {
-    return new Promise((resolve, reject) => {
+  run(source: string, loaderContext: XeCSSLoaderContext) {
+    return new Promise<void>((resolve, reject) => {
       this.tasks.add(
-        new Promise(_resolve => {
+        new Promise<void>(_resolve => {
           try {
             const len = this.collector.size;
             const matched = source.match(this.templateMatcher);
@@ -245,13 +261,16 @@ class XeCssParser {
   }
 }
 
-class XeCssGenerator {
-  constructor(rules = [], prefix) {
+class XeCSSGenerator {
+  private readonly rules: XeCSSRule[];
+  private readonly prefix: string;
+
+  constructor(rules: XeCSSRule[] = [], prefix?: string) {
     this.rules = rules;
     this.prefix = prefix || 'xe';
   }
 
-  parse(entries) {
+  parse(entries: [string, number][]) {
     if (!Array.isArray(this.rules) || !this.rules.length) return '';
     try {
       return entries.reduce((res, entry) => {
@@ -259,12 +278,13 @@ class XeCssGenerator {
       }, '');
     } catch (e) {
       console.log('error=>', e);
+      return '';
     }
   }
 
-  normalize([attrEntry, tag]) {
+  normalize([attrEntry, tag]: [string, number]) {
     let [attr, value] = attrEntry.split('=');
-    let attrResult = attr.replace(new RegExp(`${this.prefix}-?`,'g'), '');
+    let attrResult = attr.replace(new RegExp(`${this.prefix}-?`, 'g'), '');
     let valueResult = value;
     let pseudo = '';
     if (tag & MATCHER_TYPE.PSEUDO) {
@@ -281,24 +301,24 @@ class XeCssGenerator {
     }
     if (tag & MATCHER_TYPE.APPEND) {
       attrResult = attrResult.replace(/(:[^:]+)$/, a => {
-        valueResult += `-${a.slice(1)}`;
+        valueResult += `-${ a.slice(1) }`;
         return '';
       });
     }
-    const tokens = `${attrResult}${attrResult && valueResult ? '-' : ''}${valueResult}`;
+    const token = `${ attrResult }${ attrResult && valueResult ? '-' : '' }${ valueResult }`;
     let result = '';
     this.rules.some(([reg, handler]) => {
-      const matches = tokens.match(reg);
+      const matches = token.match(reg);
       if (!matches) return;
       const styles = handler?.(matches.slice(1));
       if (styles && typeof styles === 'object') {
         const split = tag & MATCHER_TYPE.MULTIPLY ? '~=' : '=';
-        const propertySelector = attr + (value ? split + `"${value}"` : '');
+        const propertySelector = attr + (value ? split + `"${ value }"` : '');
         const classContent = Object.entries(styles).reduce((res, [p, v]) => {
-          return res + `${p}:${v}!important;`;
+          return res + `${ p }:${ v }!important;`;
         }, '');
         return (result = classContent
-          ? `[${transform(propertySelector)}]${pseudo ? ':' + pseudo : ''} { ${classContent} } `
+          ? `[${ transform(propertySelector) }]${ pseudo ? ':' + pseudo : '' } { ${ classContent } } `
           : result);
       }
     });
@@ -307,19 +327,19 @@ class XeCssGenerator {
 }
 
 // ------------------------------------ rules ---------------------------------
-function getDistance(d) {
+function getDistance(d: string) {
   const isPercent = d.match(/-?\d+%/);
-  return isPercent ? d : `${d}px`;
+  return isPercent ? d : `${ d }px`;
 }
 
-const DIRECTION_MAP = {
+const DIRECTION_MAP: Record<string, string> = {
   l: 'left',
   r: 'right',
   b: 'bottom',
   t: 'top'
 };
 
-const DISPLAY_MAP = {
+const DISPLAY_MAP: Record<string, string> = {
   ib: 'inline-block',
   b: 'block',
   flex: 'flex',
@@ -328,20 +348,20 @@ const DISPLAY_MAP = {
   none: 'none'
 };
 
-const ALIGN_MAP = {
+const ALIGN_MAP: Record<string, string> = {
   l: 'left',
   r: 'right',
   c: 'center'
 };
 
-const BORDER_TYPE = {
+const BORDER_TYPE: Record<string, string> = {
   w: 'width',
   c: 'color',
   s: 'style',
   r: 'radius'
 };
 
-const FLEX_MAP = {
+const FLEX_MAP: Record<string, Record<string, string>> = {
   TYPE: {
     ai: 'align-items',
     jc: 'justify-content',
@@ -356,7 +376,7 @@ const FLEX_MAP = {
   }
 };
 
-const COLOR_MAP = {
+const COLOR_MAP: Record<string, string> = {
   primary: '#0084ff',
   danger: '#f9463f',
   warning: '#fa8c16',
@@ -374,14 +394,14 @@ const COLOR_MAP = {
   black: '#000000'
 };
 
-function parseColorHex2Rgb(color) {
+function parseColorHex2Rgb(color: string): number[] {
   // 这里取了个默认值, 如果没匹配上就取primary
   color = color.match(/^#[0-9a-f]{6}/) ? color : COLOR_MAP.primary;
-  const list = color.match(/#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/) || [];
-  return list.slice(1).map(c => parseInt(`0x${c}`));
+  const list = color.match(/#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/);
+  return list!.slice(1).map(c => parseInt(`0x${ c }`));
 }
 
-function parseColor(color) {
+function parseColor(color: string) {
   if (COLOR_MAP[color]) {
     return COLOR_MAP[color];
   }
@@ -389,23 +409,24 @@ function parseColor(color) {
     return color;
   }
   if (color.match(/^[0-9a-f]{3}$/) || color.match(/^[0-9a-f]{6}$/)) {
-    return `#${color}`;
+    return `#${ color }`;
   }
   return COLOR_MAP.primary;
 }
 
-function getColorValue(color, deep, opacity) {
-  let resultColor = parseColor(color);
-  let resultOpacity = '1';
-  if (resultColor.match(/^#[0-9a-f]{6}/)) {
-    resultColor = parseColorHex2Rgb(resultColor);
+function getColorValue(color: string, deep: string, opacity: string) {
+  let hexColor = parseColor(color);
+  let resultColor = [0, 0, 0];
+  let resultOpacity = 1;
+  if (hexColor.match(/^#[0-9a-f]{6}/)) {
+    resultColor = parseColorHex2Rgb(hexColor);
     deep &&
     (resultColor = resultColor.map(
       c => ~~(c + (255 - c) * ((100 - Math.min(100, +deep)) / 100))
     ));
     opacity && (resultOpacity = Math.min(100, +opacity) / 100);
   }
-  return resultColor ? `rgba(${resultColor.join(',')},${resultOpacity})` : '';
+  return resultColor ? `rgba(${ resultColor.join(',') },${ resultOpacity })` : '';
 }
 
 /**
@@ -436,7 +457,7 @@ const XeCSSDefaultPseudos = ['focus', 'hover'];
  *    如果是纯属性的写法,就没办法写 xe-m-10% 百分号不能作属性, 但可以xe='m-10%'
  *    函数至少得返回一个空对象,不然报错,因为既然匹配上了正则那说明值是正确的
  * */
-const XeCSSDefaultRules = [
+const XeCSSDefaultRules: XeCSSRule[] = [
   // 匹配所有的margin与padding  如  xe-mtbl-10  即代表 上下左方向的margin 为10px, 同时xe-m--10表示 所有方向的margin为-10px 支持百分号与负数
   [
     /^([mp])([tblr]{0,4})-(-?\d+%?)$/,
@@ -445,9 +466,9 @@ const XeCSSDefaultRules = [
       if (!direction) {
         return { [type]: getDistance(value) };
       } else {
-        const result = {};
+        const result: Record<string, string> = {};
         Array.from(direction).forEach(d => {
-          result[`${type}-${DIRECTION_MAP[d]}`] = getDistance(value);
+          result[`${ type }-${ DIRECTION_MAP[d] }`] = getDistance(value);
         });
         return result;
       }
@@ -459,7 +480,7 @@ const XeCSSDefaultRules = [
     ([prepend, type, value]) => {
       return {
         [(prepend === 'm' ? 'max-' : prepend === 'mi' ? 'min-' : '') +
-        (type === 'h' ? 'height' : 'width')]: getDistance(value)
+         (type === 'h' ? 'height' : 'width')]: getDistance(value)
       };
     }
   ],
@@ -467,14 +488,14 @@ const XeCSSDefaultRules = [
   [
     /^fs-(\d+)$/,
     ([value]) => {
-      return { 'font-size': `${value}px` };
+      return { 'font-size': `${ value }px` };
     }
   ],
   // 匹配大部分常用的display, 如 xe-dp-b 表示display:block 缩写具体看 DISPLAY_MAP
   [
     /^dp-([a-z]+)$/,
-    ([type]) => {
-      const display = DISPLAY_MAP[type] || type;
+    ([type]): Record<string, string> => {
+      const display = DISPLAY_MAP[type]! || type;
       return display ? { display } : {};
     }
   ],
@@ -506,7 +527,7 @@ const XeCSSDefaultRules = [
   // 用于 xe-flex='~ jc-center' 这种情况
   [
     /^flex-?(~|jc|ai|d|wrap|center|[0-9])?-?([a-z-]*)$/,
-    ([type, value]) => {
+    ([type, value]): Record<string, string> => {
       if (type === '~' || !type) return { display: 'flex' };
       if (parseInt(type)) {
         return { flex: type };
@@ -543,14 +564,14 @@ const XeCSSDefaultRules = [
   [
     /^bor-([wcsr]+)([ltrb]*)-([a-z\d]+)$/,
     ([type, direction, value]) => {
-      value = ['w', 'r'].includes(type) ? `${value}px` : value;
+      value = ['w', 'r'].includes(type) ? `${ value }px` : value;
       if (!direction) {
-        return { [`border-${BORDER_TYPE[type]}`]: value };
+        return { [`border-${ BORDER_TYPE[type] }`]: value };
       }
       return Array.from(direction).reduce((result, d) => {
-        result[`border-${DISPLAY_MAP[d]}-${type}`] = value;
+        result[`border-${ DISPLAY_MAP[d] }-${ type }`] = value;
         return result;
-      }, {});
+      }, {} as Record<string, string>);
     }
   ],
   // 匹配cursor
@@ -562,4 +583,4 @@ const XeCSSDefaultRules = [
   ]
 ];
 
-module.exports = { MATCHER_TYPE, XeCssParser, XeCssGenerator, XeCSSDefaultRules, XeCSSDefaultPseudos };
+export { MATCHER_TYPE, XeCSSParser, XeCSSGenerator, XeCSSDefaultRules, XeCSSDefaultPseudos };

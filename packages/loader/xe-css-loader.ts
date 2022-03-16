@@ -1,4 +1,6 @@
-function XeCssLoader(source) {
+import { XeCSSLoaderContext, XeCSSPluginContext } from '../types';
+
+function XeCSSLoader(this: XeCSSPluginContext, source: string = '') {
   const { _isVirtual_ } = this.query;
   if (_isVirtual_) {
     this.cacheable(false);
@@ -7,17 +9,17 @@ function XeCssLoader(source) {
     if (plugin) {
       plugin.load().then(
         code => {
-          callback(null, code);
+          callback!(null, code as string);
         },
-        err => {
-          callback(err);
+        (err: Error) => {
+          callback!(err as Error);
         }
       );
     } else {
-      callback(null, source);
+      callback!(null, source as string);
     }
   } else {
-    const context = {
+    const context: XeCSSLoaderContext = {
       error: error => this.emitError(typeof error === 'string' ? new Error(error) : error),
       warn: error => this.emitWarning(typeof error === 'string' ? new Error(error) : error)
     };
@@ -31,4 +33,4 @@ function XeCssLoader(source) {
   }
 }
 
-module.exports = XeCssLoader;
+module.exports = XeCSSLoader;

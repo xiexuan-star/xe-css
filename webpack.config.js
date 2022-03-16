@@ -9,9 +9,8 @@ module.exports = {
   mode: "production",
   output: {
     path: path.resolve(__dirname, 'dist'),
-    filename: "bundle.js",
-    library: "lib",
-    libraryTarget: "umd",
+    filename: "index.js",
+    libraryTarget: "commonjs",
   },
   module: {
     rules: [
@@ -31,5 +30,27 @@ module.exports = {
   },
   plugins: [
     new CleanWebpackPlugin({})
-  ]
+  ],
+  optimization: {
+    splitChunks: {
+      chunks: 'all',
+      cacheGroups: {
+        loader: {
+          name: 'chunk-loader',
+          test: /[\\/]packages[\\/]loader[\\/]xe-css-loader\.js$/,
+          chunks: 'async'
+        },
+        plugin: {
+          name: 'chunk-plugin',
+          test: /[\\/]packages[\\/]xe-css-plugin\.js$/,
+          chunks: 'initial'
+        },
+        config: {
+          name: 'chunk-config',
+          test: /[\\/]packages[\\/]xe-css\.js$/,
+          chunks: 'async'
+        }
+      }
+    }
+  }
 };
