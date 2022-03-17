@@ -1,5 +1,5 @@
 'use strict';
-const { XeCSSPlugin, XeCSSDefaultRules, XeCSSDefaultPseudos } = require('./packages/xe-css-plugin');
+const { XeCSSPlugin, XeCSSDefaultRules, XeCSSDefaultPseudos } = require('./dist/xe-css-plugin');
 
 const path = require('path');
 

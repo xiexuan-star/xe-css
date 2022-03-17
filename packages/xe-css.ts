@@ -1,4 +1,7 @@
-import { ElementNode, ForNode, IfBranchNode, IfNode, TemplateChildNode } from '@vue/compiler-core';
+import {
+  SimpleExpressionNode, ExpressionNode, CompoundExpressionNode, DirectiveNode, ElementNode, ForNode, IfBranchNode,
+  IfNode, TemplateChildNode, AttributeNode
+} from '@vue/compiler-core';
 import { XeCSSLoaderContext, XeCSSParserOptions, XeCSSRule } from './types';
 import { compileTemplate, SFCTemplateCompileOptions, SFCTemplateCompileResults } from '@vue/compiler-sfc';
 // @ts-ignore
@@ -61,6 +64,18 @@ function isForNode(node: TemplateChildNode): node is ForNode {
   return node.type === 11;
 }
 
+function isSimpleExp(node: ExpressionNode): node is SimpleExpressionNode {
+  return node.type === 4;
+}
+
+function isCompoundExp(node: ExpressionNode): node is CompoundExpressionNode {
+  return node.type === 8;
+}
+
+function isDirectiveNode(node: AttributeNode | DirectiveNode): node is DirectiveNode {
+  return node.type === 7;
+}
+
 // ------------------------------------ constructor ---------------------------------
 /** @constructor */
 class XeCSSParser {
@@ -73,6 +88,7 @@ class XeCSSParser {
   private readonly commonMarcher: RegExp;
   private readonly appendMarcher: RegExp;
   private readonly templateMatcher = /<template>(.|\n)+<\/template>/;
+  private readonly ternaryMatcher = /(.+)\?(['"].+['"]):(['"].+['"])/;
   private readonly cachePath = path.resolve(__dirname, `xe-css.json`);
 
   /**
@@ -82,7 +98,7 @@ class XeCSSParser {
     const { pseudos, prefix } = options;
     this.prefix = prefix || 'xe';
     Array.isArray(pseudos) && (this.pseudos = pseudos);
-    this.pseudoMatcher = new RegExp(`^${this.pseudos.map(item => `${item}:`).join('|')}`);
+    this.pseudoMatcher = new RegExp(`^(${this.pseudos.map(item => `${item}:`).join('|')})`);
     this.commonMarcher = new RegExp(`^${this.prefix}[:-]?`);
     this.appendMarcher = new RegExp(`${this.prefix}(.*):(.+)`);
   }
@@ -126,10 +142,18 @@ class XeCSSParser {
   collect(property: string, value: string, tag: number) {
     if (tag & MATCHER_TYPE.MULTIPLY) {
       value.split(' ').forEach(v => {
-        this.collector.set(`${ property }=${ v }`, tag);
+        this.collector.set(
+          `${ property }=${ v }`,
+          v.match(this.pseudoMatcher)
+            ? (tag | MATCHER_TYPE.VALUE_PSEUDO)
+            : tag)
+        ;
       });
     } else {
       const key = `${ property }=${ value }`;
+      if (value.match(this.pseudoMatcher)) {
+        tag |= MATCHER_TYPE.VALUE_PSEUDO;
+      }
       const oldTag = this.collector.get(key) || 0;
       if (oldTag != null && oldTag !== tag) {
         this.needPatch = true;
@@ -158,9 +182,6 @@ class XeCSSParser {
     let tag = 0;
     if (attr.match(this.appendMarcher)) {
       tag |= MATCHER_TYPE.APPEND;
-    }
-    if (value.match(this.pseudoMatcher)) {
-      tag |= MATCHER_TYPE.VALUE_PSEUDO;
     }
     if (~value.indexOf(' ')) {
       tag |= MATCHER_TYPE.MULTIPLY;
@@ -206,12 +227,31 @@ class XeCSSParser {
     });
   }
 
+  parseDirectiveNode(node: DirectiveNode) {
+    if (!node.arg || !node.exp || node.name !== 'bind') return;
+    if (isSimpleExp(node.arg) && isCompoundExp(node.exp)) {
+      const attr = node.arg.content;
+      let tag = this.matchAttrType(attr);
+      if (!tag) return;
+      const ternaryMatched = node.exp.loc.source.match(this.ternaryMatcher);
+      if (ternaryMatched) {
+        const value = ternaryMatched.splice(2).join(' ').replace(/['"]/g, '');
+        tag |= this.matchNodeType(attr, value);
+        this.collect(attr, value, tag);
+      }
+    }
+  }
+
   parseElementNode(node: ElementNode) {
     if (node.props.length) {
       const needParsePropsMap = new Map();
       node.props.forEach(propNode => {
-        const tag = this.matchAttrType(propNode.name);
-        tag && needParsePropsMap.set(propNode, tag);
+        if (isDirectiveNode(propNode)) {
+          this.parseDirectiveNode(propNode);
+        } else {
+          const tag = this.matchAttrType(propNode.name);
+          tag && needParsePropsMap.set(propNode, tag);
+        }
       });
       if (needParsePropsMap.size) {
         traverseMap(needParsePropsMap, ([propNode, tag]) => {
@@ -563,8 +603,8 @@ const XeCSSDefaultRules: XeCSSRule[] = [
   // 如  xe-bor-rlr-4 表示 border-left/right-radius: 4px
   [
     /^bor-([wcsr]+)([ltrb]*)-([a-z\d]+)-?(\d+)?(\/?\d+)?$/,
-    ([type, direction, value,deep,opacity]) => {
-      value = ['w', 'r'].includes(type) ? `${ value }px` : type==='c'?getColorValue(value,deep,opacity):value;
+    ([type, direction, value, deep, opacity]) => {
+      value = ['w', 'r'].includes(type) ? `${ value }px` : type === 'c' ? getColorValue(value, deep, opacity) : value;
       if (!direction) {
         return { [`border-${ BORDER_TYPE[type] }`]: value };
       }
