@@ -88,7 +88,7 @@ class XeCSSParser {
   private readonly commonMarcher: RegExp;
   private readonly appendMarcher: RegExp;
   private readonly templateMatcher = /<template>(.|\n)+<\/template>/;
-  private readonly ternaryMatcher = /(.+)\?(['"].+['"]):(['"].+['"])/;
+  private readonly ternaryMatcher = /(.+)\s*\?\s*(['"].+['"])\s*:\s*(['"].+['"])/;
   private readonly cachePath = path.resolve(__dirname, `xe-css.json`);
 
   /**
@@ -218,6 +218,7 @@ class XeCSSParser {
        * TEXT_CALL = 12,
        */
       if (isElementNode(node)) {
+        if (node.tag === 'svg') return;
         this.parseElementNode(node);
       } else if (isIfNode(node)) {
         this.handleAstChildren(node.branches);
