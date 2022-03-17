@@ -562,9 +562,9 @@ const XeCSSDefaultRules: XeCSSRule[] = [
   // 匹配border, 4个type w/c/s/r width/color/style/radius
   // 如  xe-bor-rlr-4 表示 border-left/right-radius: 4px
   [
-    /^bor-([wcsr]+)([ltrb]*)-([a-z\d]+)$/,
-    ([type, direction, value]) => {
-      value = ['w', 'r'].includes(type) ? `${ value }px` : value;
+    /^bor-([wcsr]+)([ltrb]*)-([a-z\d]+)-?(\d+)?(\/?\d+)?$/,
+    ([type, direction, value,deep,opacity]) => {
+      value = ['w', 'r'].includes(type) ? `${ value }px` : type==='c'?getColorValue(value,deep,opacity):value;
       if (!direction) {
         return { [`border-${ BORDER_TYPE[type] }`]: value };
       }
