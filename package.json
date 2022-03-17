@@ -20,8 +20,8 @@
   "main": "dist/xe-css-plugin.js",
   "exports": {
     ".": {
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.js"
+      "import": "./dist/xe-css-plugin.mjs",
+      "require": "./dist/xe-css-plugin.js"
     },
     "./dist/loaders/load": "./dist/packages/loader/xe-css-loader.js"
   },
