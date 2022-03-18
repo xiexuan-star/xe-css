@@ -603,14 +603,14 @@ const XeCSSDefaultRules: XeCSSRule[] = [
   // 匹配border, 4个type w/c/s/r width/color/style/radius
   // 如  xe-bor-rlr-4 表示 border-left/right-radius: 4px
   [
-    /^bor-([wcsr]+)([ltrb]*)-([a-z\d]+)-?(\d+)?(\/?\d+)?$/,
+    /^bor-([wcsr])([ltrb]{0,4})-([a-z\d]+)-?(\d+)?(\/?\d+)?$/,
     ([type, direction, value, deep, opacity]) => {
       value = ['w', 'r'].includes(type) ? `${ value }px` : type === 'c' ? getColorValue(value, deep, opacity) : value;
       if (!direction) {
         return { [`border-${ BORDER_TYPE[type] }`]: value };
       }
       return Array.from(direction).reduce((result, d) => {
-        result[`border-${ DISPLAY_MAP[d] }-${ type }`] = value;
+        result[`border-${ DIRECTION_MAP[d] }-${ type }`] = value;
         return result;
       }, {} as Record<string, string>);
     }
@@ -620,6 +620,32 @@ const XeCSSDefaultRules: XeCSSRule[] = [
     /^cursor-([a-z]+)$/,
     ([cursor]) => {
       return { cursor };
+    }
+  ],
+  [
+    /^flex-gap-([0-9]+)-?([0-9]+)?$/,
+    ([row, column]) => {
+      return {
+        gap: `${ row }px` + (column ? ` ${ column }px` : '')
+      };
+    }
+  ],
+  [
+    /^border-box$/,
+    () => {
+      return { 'box-sizing': 'border-box' };
+    }
+  ],
+  [
+    /^lh-([\da-z]+)$/,
+    ([value]) => {
+      return { 'line-height': `${ value }` };
+    }
+  ],
+  [
+    /^valign-([a-z]+)$/,
+    ([value]) => {
+      return { 'vertical-align': value };
     }
   ]
 ];
