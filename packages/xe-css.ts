@@ -597,7 +597,7 @@ const XeCSSDefaultRules: XeCSSRule[] = [
   [
     /^([lrtb])-(-?\d+%?)$/,
     ([type, value]) => {
-      return { [DISPLAY_MAP[type]]: getDistance(value) };
+      return { [DIRECTION_MAP[type]]: getDistance(value) };
     }
   ],
   // 匹配border, 4个type w/c/s/r width/color/style/radius
