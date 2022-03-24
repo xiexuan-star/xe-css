@@ -1,4 +1,4 @@
-# zx-css
+# xe-css
 
 ## Project setup
 ```
