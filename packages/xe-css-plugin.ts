@@ -27,7 +27,6 @@ async function getCache() {
         if (err) resolve([]);
         try {
           const data = JSON.parse(result);
-          console.log({ data });
           resolve(Array.isArray(data) ? data : []);
         } catch (e: any) {
           resolve([]);
@@ -166,6 +165,7 @@ class XeCSSPlugin {
                     console.error(err);
                   }
                   const json = JSON.stringify(fileCollection);
+                  if (!fileCollection.length) return callback(null, json);
                   fs.writeFile(key, json, 'utf-8', (err: any) => {
                     if (err) throw err;
                     callback(null, json);
