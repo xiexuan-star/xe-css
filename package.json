@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "@types/node": "^17.0.21",
+    "cache-loader": "^4.1.0",
     "clean-webpack-plugin": "^4.0.0",
+    "find-cache-dir": "^3.3.2",
     "glob": "^7.2.0",
     "tsup": "^5.12.1",
     "webpack-node-externals": "^3.0.0",
@@ -26,9 +28,7 @@
     "./dist/loaders/load": "./dist/packages/loader/xe-css-loader.js"
   },
   "devDependencies": {
-    "core-js": "^3.6.5",
-    "unplugin-auto-import": "^0.6.6",
-    "vue": "^3.2.31",
+    "@types/find-cache-dir": "^3.2.1",
     "@typescript-eslint/eslint-plugin": "^4.18.0",
     "@typescript-eslint/parser": "^4.18.0",
     "@vue/cli-plugin-babel": "~4.5.13",
@@ -38,6 +38,7 @@
     "@vue/compiler-sfc": "^3.2.31",
     "@vue/eslint-config-standard": "^5.1.2",
     "@vue/eslint-config-typescript": "^7.0.0",
+    "core-js": "^3.6.5",
     "eslint": "^6.7.2",
     "eslint-plugin-import": "^2.20.2",
     "eslint-plugin-node": "^11.1.0",
@@ -45,6 +46,8 @@
     "eslint-plugin-standard": "^4.0.0",
     "eslint-plugin-vue": "^7.0.0",
     "typescript": "~4.1.5",
+    "unplugin-auto-import": "^0.6.6",
+    "vue": "^3.2.31",
     "webpack": "4.46",
     "webpack-cli": "^4.9.2"
   },

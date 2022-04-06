@@ -1,20 +1,58 @@
 import { ResolvePlugin } from 'webpack';
 import { XeCSSCompilation, XeCSSCompiler, XeCSSPluginOptions } from './types';
 import { XeCSSDefaultPseudos, XeCSSDefaultRules, XeCSSGenerator, XeCSSParser } from './xe-css';
-// @ts-ignore
 import path from 'path';
-// @ts-ignore
+import fs from 'fs';
+import os from 'os';
+import findCacheDir from 'find-cache-dir';
 import WebpackSources from 'webpack-sources';
-// @ts-ignore
 import VirtualModulesPlugin from 'webpack-virtual-modules';
+import glob from 'glob';
 
 const XeCSSLoader = path.resolve(__dirname, './loader/xe-css-loader');
+const CacheLoader = 'cache-loader';
+
+const cacheSearchPath = 'node_modules/.cache/xe-css-loader/*.json';
+
+async function getCache() {
+  const fileList = await new Promise<string[]>((resolve, reject) => {
+    glob(cacheSearchPath, {}, (err, matches) => {
+      if (err) reject();
+      resolve(matches);
+    });
+  });
+  return Promise.all(fileList.map(file => {
+    return new Promise<any[]>(resolve => {
+      fs.readFile(file, 'utf-8', (err, result) => {
+        if (err) resolve([]);
+        try {
+          const data = JSON.parse(result);
+          console.log({ data });
+          resolve(Array.isArray(data) ? data : []);
+        } catch (e: any) {
+          resolve([]);
+        }
+      });
+    });
+  })).then(dataList => {
+    return dataList.reduce((res, data) => {
+      return res.concat(data);
+    }, [] as any[]);
+  });
+}
+
+async function setCache() {
+
+}
 
 /** @constructor */
 class XeCSSPlugin {
   private readonly prefix: string;
+  private readonly cacheId = findCacheDir({
+    name: 'xe-css-loader'
+  }) || os.tmpdir();
   private readonly PluginName = 'XeCSSPlugin';
-  private readonly outPutFileName = 'xe-css.css';
+  private readonly outPutFileName = `xe-css.${ ~~Math.random() * 10 ** 10 }.css`;
   private readonly __virtualModulePrefix = path.resolve(process.cwd(), '_virtual_');
   private readonly __vfsModules = new Set<string>();
   private readonly generator: XeCSSGenerator;
@@ -30,9 +68,11 @@ class XeCSSPlugin {
     this.prefix = options.prefix || 'xe';
     this.generator = new XeCSSGenerator(options.rules || [], this.prefix);
     this.parser = new XeCSSParser({ pseudos: options.pseudos, prefix: this.prefix });
-    this.parser.loadCache().then(async () => {
-      await this.load(true);
-      this.updateModule();
+    getCache().then(data => {
+      this.parser.loadCache(data).then(async () => {
+        await this.load(true);
+        this.updateModule();
+      });
     });
   }
 
@@ -84,7 +124,7 @@ class XeCSSPlugin {
           if (id.includes(this.__virtualModulePrefix)) {
             return callback();
           }
-          if (id.includes(this.outPutFileName) && !id.includes('_virtual_')) {
+          if (id.includes('xe-css.css') && !id.includes('_virtual_')) {
             id = this.__virtualModulePrefix + id;
             this.__vfs.writeModule(id, '');
             this.__vfsModules.add(id);
@@ -104,15 +144,37 @@ class XeCSSPlugin {
 
 
     compiler.$xecssContext = compiler.$xecssContext || {
-      parser: this.parser,
       load: this.load.bind(this),
-      updateModule: this.updateModule.bind(this)
     };
     if (compiler.options.module?.rules) {
       compiler.options.module.rules.push({
         test: /\.vue/,
         include: path.resolve('src'),
-        loader: XeCSSLoader
+        use: [{
+          loader: CacheLoader,
+          options: {
+            cacheDirectory: this.cacheId,
+            read(id: string, callback: any) {
+              fs.readFile(id, 'utf8', callback);
+            },
+            write: (key: string, data: any, callback: any) => {
+              data = Buffer.from(data.result[0]).toString('utf-8');
+              this.parser.run(data).then((fileCollection) => {
+                this.parser.needPatch && this.updateModule();
+                fs.mkdir(key.replace(/\/[^/]+\.json$/, ''), { recursive: true }, (err) => {
+                  if (err) {
+                    console.error(err);
+                  }
+                  const json = JSON.stringify(fileCollection);
+                  fs.writeFile(key, json, 'utf-8', (err: any) => {
+                    if (err) throw err;
+                    callback(null, json);
+                  });
+                });
+              });
+            }
+          }
+        }]
       });
       compiler.options.module.rules.push({
         include: id => {
@@ -133,7 +195,6 @@ class XeCSSPlugin {
       const compilation = _compilation as XeCSSCompilation;
       compilation.hooks.optimizeAssets.tapPromise(this.PluginName, async () => {
         await this.load();
-        this.parser.emitCache();
         compilation.assets[this.outPutFileName] = new WebpackSources.RawSource(this.rawCss);
       });
       compilation.hooks.htmlWebpackPluginAfterHtmlProcessing.tapAsync(

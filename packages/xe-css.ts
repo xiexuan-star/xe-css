@@ -89,7 +89,6 @@ class XeCSSParser {
   private readonly appendMarcher: RegExp;
   private readonly templateMatcher = /<template>(.|\n)+<\/template>/;
   private readonly ternaryMatcher = /(.+)\s*\?\s*(['"].+['"])\s*:\s*(['"].+['"])/;
-  private readonly cachePath = path.resolve(__dirname, `xe-css.json`);
 
   /**
    * @param options { {pseudos:string[],prefix:string} }
@@ -103,34 +102,13 @@ class XeCSSParser {
     this.appendMarcher = new RegExp(`${this.prefix}(.*):(.+)`);
   }
 
-  emitCache() {
-    const data = mapToEntries(this.collector);
-    fs.writeFile(this.cachePath, JSON.stringify(data), err => {
-      err && console.log(err);
-    });
-  }
-
-  loadCache() {
-    return new Promise<string>((resolve, reject) => {
-      fs.readFile(this.cachePath, (err, content) => {
-        err ? reject() : resolve(content.toString('utf8'));
+  loadCache(entries: [string, number][]) {
+    return new Promise<void>(resolve => {
+      entries.forEach(([key, value]) => {
+        this.collector.set(key, value);
       });
-    }).then(
-      content => {
-        try {
-          content && JSON.parse(content).forEach((entry: [string, number]) => {
-            this.collector.set(...entry);
-          });
-        } catch (e) {
-          console.log(e);
-        }
-      },
-      () => {
-        fs.writeFile(this.cachePath, JSON.stringify([]), err => {
-          err && console.log(err);
-        });
-      }
-    );
+      resolve();
+    });
   }
 
   /**
@@ -140,14 +118,15 @@ class XeCSSParser {
    * @description before collect a xe-css property, it should be analyzed and assembled
    * */
   collect(property: string, value: string, tag: number) {
+    const result = [];
     if (tag & MATCHER_TYPE.MULTIPLY) {
       value.split(' ').forEach(v => {
-        this.collector.set(
-          `${ property }=${ v }`,
-          v.match(this.pseudoMatcher)
-            ? (tag | MATCHER_TYPE.VALUE_PSEUDO)
-            : tag)
-        ;
+        const key = `${ property }=${ v }`;
+        const value = v.match(this.pseudoMatcher)
+          ? (tag | MATCHER_TYPE.VALUE_PSEUDO)
+          : tag;
+        this.collector.set(key, value);
+        result.push([key, value]);
       });
     } else {
       const key = `${ property }=${ value }`;
@@ -158,8 +137,11 @@ class XeCSSParser {
       if (oldTag != null && oldTag !== tag) {
         this.needPatch = true;
       }
-      this.collector.set(key, tag | oldTag);
+      const newTag = oldTag | tag;
+      this.collector.set(key, newTag);
+      result.push([key, newTag]);
     }
+    return result;
   }
 
   /**
@@ -195,12 +177,13 @@ class XeCSSParser {
 
   handlerCompileResult(compileResults: SFCTemplateCompileResults) {
     const { ast } = compileResults;
-    if (!ast) return;
-    this.handleAstChildren(ast.children);
+    if (!ast) return [] as any[];
+    return this.handleAstChildren(ast.children);
   }
 
   handleAstChildren(nodeList: TemplateChildNode[]) {
-    if (!nodeList) return;
+    if (!nodeList) return [];
+    const result: any[] = [];
     nodeList.forEach(node => {
       /*
        * ROOT = 0,
@@ -219,36 +202,39 @@ class XeCSSParser {
        */
       if (isElementNode(node)) {
         if (node.tag === 'svg') return;
-        this.parseElementNode(node);
+        result.push(...this.parseElementNode(node));
       } else if (isIfNode(node)) {
-        this.handleAstChildren(node.branches);
+        result.push(...this.handleAstChildren(node.branches));
       } else if (isForNode(node) || isIfBranchNode(node)) {
-        this.handleAstChildren(node.children);
+        result.push(...this.handleAstChildren(node.children));
       }
     });
+    return result;
   }
 
   parseDirectiveNode(node: DirectiveNode) {
-    if (!node.arg || !node.exp || node.name !== 'bind') return;
+    if (!node.arg || !node.exp || node.name !== 'bind') return [];
     if (isSimpleExp(node.arg) && isCompoundExp(node.exp)) {
       const attr = node.arg.content;
       let tag = this.matchAttrType(attr);
-      if (!tag) return;
+      if (!tag) return [];
       const ternaryMatched = node.exp.loc.source.match(this.ternaryMatcher);
       if (ternaryMatched) {
         const value = ternaryMatched.splice(2).join(' ').replace(/['"]/g, '');
         tag |= this.matchNodeType(attr, value);
-        this.collect(attr, value, tag);
+        return this.collect(attr, value, tag);
       }
     }
+    return [];
   }
 
   parseElementNode(node: ElementNode) {
+    const result = [];
     if (node.props.length) {
       const needParsePropsMap = new Map();
       node.props.forEach(propNode => {
         if (isDirectiveNode(propNode)) {
-          this.parseDirectiveNode(propNode);
+          result.push(...this.parseDirectiveNode(propNode));
         } else {
           const tag = this.matchAttrType(propNode.name);
           tag && needParsePropsMap.set(propNode, tag);
@@ -259,15 +245,17 @@ class XeCSSParser {
           const attr = propNode.name;
           const value = unpack(propNode);
           tag |= this.matchNodeType(attr, value);
-          this.collect(attr, value, tag);
+          const res = this.collect(attr, value, tag);
+          result.push(...res);
         });
       }
     }
-    this.handleAstChildren(node.children);
+    result.push(...this.handleAstChildren(node.children));
+    return result;
   }
 
-  run(source: string, loaderContext: XeCSSLoaderContext) {
-    return new Promise<void>((resolve, reject) => {
+  run(source: string) {
+    return new Promise<any[]>((resolve, reject) => {
       this.tasks.add(
         new Promise<void>(_resolve => {
           try {
@@ -277,14 +265,13 @@ class XeCSSParser {
             const templateSource = compileTemplate(
               this.mergeBaseCompilerOptions({ source: matched[0] })
             );
-            this.handlerCompileResult(templateSource);
+            const result = this.handlerCompileResult(templateSource);
             if (len < this.collector.size) {
               this.needPatch = true;
             }
-            resolve();
+            resolve(result);
           } catch (e) {
             reject();
-            loaderContext.error(e);
           } finally {
             _resolve();
           }
