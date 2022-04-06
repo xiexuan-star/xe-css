@@ -51,7 +51,7 @@ class XeCSSPlugin {
     name: 'xe-css-loader'
   }) || os.tmpdir();
   private readonly PluginName = 'XeCSSPlugin';
-  private readonly outPutFileName = `xe-css.${ ~~Math.random() * 10 ** 10 }.css`;
+  private readonly outPutFileName = `xe-css.${ (Math.random() * 10 ** 10).toFixed(0) }.css`;
   private readonly __virtualModulePrefix = path.resolve(process.cwd(), '_virtual_');
   private readonly __vfsModules = new Set<string>();
   private readonly generator: XeCSSGenerator;
