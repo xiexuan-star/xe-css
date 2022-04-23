@@ -1,6 +1,7 @@
 import { ResolvePlugin } from 'webpack';
 import { XeCSSCompilation, XeCSSCompiler, XeCSSPluginOptions } from './types';
 import { XeCSSDefaultPseudos, XeCSSDefaultRules, XeCSSGenerator, XeCSSParser } from './xe-css';
+// @ts-ignore
 import path from 'path';
 import fs from 'fs';
 import os from 'os';

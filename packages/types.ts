@@ -17,8 +17,8 @@ export type XeCSSPluginContext = loader.LoaderContext & { _compiler: XeCSSCompil
 
 export type XeCSSPluginExpose = {
   load(): Promise<string>,
-  parser: XeCSSParser,
-  updateModule(): void
+  // parser: XeCSSParser,
+  // updateModule(): void
 }
 
 export type XeCSSRule = [RegExp, (tokens: string[]) => Record<string, string>]
