@@ -2,12 +2,8 @@ import {
   SimpleExpressionNode, ExpressionNode, CompoundExpressionNode, DirectiveNode, ElementNode, ForNode, IfBranchNode,
   IfNode, TemplateChildNode, AttributeNode
 } from '@vue/compiler-core';
-import { XeCSSLoaderContext, XeCSSParserOptions, XeCSSRule } from './types';
+import { XeCSSParserOptions, XeCSSRule } from './types';
 import { compileTemplate, SFCTemplateCompileOptions, SFCTemplateCompileResults } from '@vue/compiler-sfc';
-// @ts-ignore
-import path from 'path';
-// @ts-ignore
-import fs from 'fs';
 // ------------------------------------ constant ---------------------------------
 const MATCHER_TYPE = {
   COMMON: 1 << 1,

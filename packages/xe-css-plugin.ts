@@ -99,7 +99,7 @@ class XeCSSPlugin {
       Array.from(this.__vfsModules).forEach(id => {
         this.__vfs.writeModule(id, this.rawCss);
       });
-    });
+    }, 300);
   }
 
   apply(compiler: XeCSSCompiler) {
