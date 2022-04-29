@@ -4,10 +4,6 @@ import {
 } from '@vue/compiler-core';
 import { XeCSSParserOptions, XeCSSRule } from './types';
 import { compileTemplate, SFCTemplateCompileOptions, SFCTemplateCompileResults } from '@vue/compiler-sfc';
-// @ts-ignore
-import path from 'path';
-// @ts-ignore
-import fs from 'fs';
 // ------------------------------------ constant ---------------------------------
 const MATCHER_TYPE = {
   COMMON: 1 << 1,
