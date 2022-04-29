@@ -9,9 +9,11 @@ export const tsup: Options = {
   dts: true,
   external: [
     './loader/xe-css-loader.ts',
+    './presets/index.ts'
   ],
   entryPoints: [
     'packages/xe-css-plugin.ts',
-    'packages/loader/xe-css-loader.ts'
+    'packages/loader/xe-css-loader.ts',
+    'packages/presets/index.ts'
   ]
 };
