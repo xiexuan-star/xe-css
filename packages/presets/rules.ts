@@ -186,7 +186,7 @@ const XeCSSDefaultRules: XeCSSRule[] = [
   ],
   // 匹配text-align,
   [
-    /^align-[lrc]$/,
+    /^align-([lrc])$/,
     ([value]) => {
       return { 'text-align': ALIGN_MAP[value] };
     }
