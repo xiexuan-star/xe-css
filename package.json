@@ -53,6 +53,6 @@
   },
   "peerDependencies": {
     "@vue/compiler-sfc": "^3.2.31",
-    "webpack": "^5.72"
+    "webpack": "^4.46"
   }
 }
