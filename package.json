@@ -1,6 +1,6 @@
 {
   "name": "xe-css",
-  "version": "1.1.9",
+  "version": "1.2.0",
   "author": "xiexuan",
   "description": "a css generator from vue template property",
   "license": "ISC",
