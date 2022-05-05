@@ -26,7 +26,8 @@
       "import": "./dist/xe-css-plugin.mjs",
       "require": "./dist/xe-css-plugin.js"
     },
-    "./dist/loaders/load": "./dist/packages/loader/xe-css-loader.js"
+    "./dist/loaders/load": "./dist/packages/loader/xe-css-loader.js",
+    "./dist/presets": "./dist/packages/presets/index.js"
   },
   "devDependencies": {
     "@types/find-cache-dir": "^3.2.1",
