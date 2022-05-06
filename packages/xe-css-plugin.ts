@@ -1,12 +1,19 @@
 import { ResolvePlugin } from 'webpack';
 import { XeCSSCompilation, XeCSSCompiler, XeCSSPluginOptions } from './types';
 import { XeCSSGenerator, XeCSSParser } from './xe-css';
+// @ts-ignore
 import path from 'path';
+// @ts-ignore
 import fs from 'fs';
+// @ts-ignore
 import os from 'os';
+// @ts-ignore
 import findCacheDir from 'find-cache-dir';
+// @ts-ignore
 import WebpackSources from 'webpack-sources';
+// @ts-ignore
 import VirtualModulesPlugin from 'webpack-virtual-modules';
+// @ts-ignore
 import glob from 'glob';
 
 const XeCSSLoader = path.resolve(__dirname, './loader/xe-css-loader');

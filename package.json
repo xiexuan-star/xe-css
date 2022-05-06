@@ -1,6 +1,6 @@
 {
   "name": "xe-css",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "author": "xiexuan",
   "description": "a css generator from vue template property",
   "license": "ISC",
@@ -26,8 +26,8 @@
       "import": "./dist/xe-css-plugin.mjs",
       "require": "./dist/xe-css-plugin.js"
     },
-    "./dist/loaders/load": "./dist/packages/loader/xe-css-loader.js",
-    "./dist/presets": "./dist/packages/presets/index.js"
+    "./dist/loaders/load": "./dist/loader/xe-css-loader.js",
+    "./dist/presets": "./dist/presets/index.js"
   },
   "devDependencies": {
     "@types/find-cache-dir": "^3.2.1",
