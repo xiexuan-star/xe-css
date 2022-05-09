@@ -1,9 +1,12 @@
 {
   "name": "xe-css",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "author": "xiexuan",
   "description": "a css generator from vue template property",
   "license": "ISC",
+  "publishConfig": {
+    "registry": "https://github.com/xiexuan-star/xe-css.git"
+  },
   "scripts": {
     "serve": "vue-cli-service serve",
     "build": "tsup"

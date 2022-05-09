@@ -237,7 +237,7 @@ const XeCSSDefaultRules: XeCSSRule[] = [
         return { [`border-${ BORDER_TYPE[type] }`]: value };
       }
       return Array.from(direction).reduce((result, d) => {
-        result[`border-${ DIRECTION_MAP[d] }-${ type }`] = value;
+        result[`border-${ DIRECTION_MAP[d] }-${ BORDER_TYPE[type] }`] = value;
         return result;
       }, {} as Record<string, string>);
     }
